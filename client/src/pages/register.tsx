@@ -54,12 +54,15 @@ export default function Register() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      localStorage.setItem('auth_token', data.access_token);
       toast({
         title: "Регистрация успешна",
-        description: "Добро пожаловать! Теперь вы можете войти в систему.",
+        description: "Добро пожаловать! Переходим в панель управления.",
       });
-      setLocation("/login");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     },
     onError: (error: any) => {
       toast({

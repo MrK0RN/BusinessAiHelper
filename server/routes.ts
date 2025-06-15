@@ -41,6 +41,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup FastAPI proxy routes
   setupFastAPIProxy(app);
 
+  // Auth proxy routes
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const response = await fetch('http://localhost:8000/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req.body)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const response = await fetch('http://localhost:8000/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req.body)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/auth/user', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: "No authorization header" });
+      }
+
+      const response = await fetch('http://localhost:8000/api/auth/user', {
+        headers: {
+          'Authorization': authHeader
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Webhook handlers for different platforms (these remain on Express)
   app.post('/api/webhook/telegram/:botId', async (req, res) => {
     try {

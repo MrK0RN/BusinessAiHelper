@@ -47,12 +47,15 @@ export default function Login() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      localStorage.setItem('auth_token', data.access_token);
       toast({
         title: "Успешный вход",
         description: "Добро пожаловать в панель управления!",
       });
-      setLocation("/dashboard");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     },
     onError: (error: any) => {
       toast({

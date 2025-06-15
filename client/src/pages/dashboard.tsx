@@ -30,7 +30,14 @@ export default function Dashboard() {
   }, [isAuthenticated, isLoading, toast]);
 
   const handleLogout = () => {
-    window.location.href = "/api/logout";
+    localStorage.removeItem('auth_token');
+    toast({
+      title: "Выход выполнен",
+      description: "До свидания!",
+    });
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
   };
 
   if (isLoading) {
