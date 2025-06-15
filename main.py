@@ -139,6 +139,9 @@ class StatsResponse(BaseModel):
     active_bots: int
     avg_response_time: int
 
+# Create tables
+Base.metadata.create_all(bind=engine)
+
 # FastAPI app
 app = FastAPI(title="AI Assistant API", version="1.0.0")
 
@@ -285,12 +288,12 @@ async def get_stats(current_user: str = Depends(get_current_user), db: Session =
         message_logs = db.query(MessageLog).filter(MessageLog.bot_id.in_(bot_ids)).all()
         total_messages = len(message_logs)
         
-        response_times = [log.response_time for log in message_logs if log.response_time]
+        response_times = [log.response_time for log in message_logs if log.response_time is not None]
         if response_times:
             avg_response_time = sum(response_times) // len(response_times)
     
     # Count active bots
-    active_bots = len([bot for bot in user_bots if bot.is_active])
+    active_bots = sum(1 for bot in user_bots if bot.is_active)
     
     return StatsResponse(
         total_messages=total_messages,
