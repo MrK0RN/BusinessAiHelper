@@ -158,14 +158,19 @@ class App {
             password: formData.get('password')
         };
 
+        console.log('Login attempt:', { email: data.email, hasPassword: !!data.password });
+
         if (!validateLoginForm(data)) {
+            console.log('Login form validation failed');
             return;
         }
 
         try {
-            await auth.login(data);
+            const result = await auth.login(data);
+            console.log('Login successful:', result);
+            this.route(); // Navigate to appropriate page
         } catch (error) {
-            // Error handling is done in auth.login
+            console.error('Login failed:', error);
         }
     }
 

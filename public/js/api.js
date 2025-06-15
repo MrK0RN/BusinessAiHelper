@@ -56,37 +56,37 @@ class API {
 
     // Auth endpoints
     async register(userData) {
-        return this.request('POST', '/auth/register', userData);
+        return this.request('POST', '/api/register', userData);
     }
 
     async login(credentials) {
-        return this.request('POST', '/auth/login', credentials);
+        return this.request('POST', '/api/login', credentials);
     }
 
     async getUser() {
-        return this.request('GET', '/auth/user');
+        return this.request('GET', '/api/user');
     }
 
     // Bot endpoints
     async getBots() {
-        return this.request('GET', '/bots');
+        return this.request('GET', '/api/bots');
     }
 
     async createBot(botData) {
-        return this.request('POST', '/bots', botData);
+        return this.request('POST', '/api/bots', botData);
     }
 
     async updateBot(id, botData) {
-        return this.request('PUT', `/bots/${id}`, botData);
+        return this.request('PUT', `/api/bots/${id}`, botData);
     }
 
     async deleteBot(id) {
-        return this.request('DELETE', `/bots/${id}`);
+        return this.request('DELETE', `/api/bots/${id}`);
     }
 
     // Knowledge base endpoints
     async getKnowledgeFiles() {
-        return this.request('GET', '/knowledge-files');
+        return this.request('GET', '/api/knowledge-files');
     }
 
     async uploadKnowledgeFile(file) {
@@ -99,7 +99,7 @@ class API {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${this.baseURL}/knowledge-files`, {
+        const response = await fetch(`${this.baseURL}/api/knowledge-files`, {
             method: 'POST',
             headers,
             body: formData
