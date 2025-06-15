@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { startFastAPI, setupFastAPIProxy } from "./fastapi_proxy";
 import multer from "multer";
@@ -35,6 +35,9 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve static files from public directory
+  app.use(express.static('public'));
+  
   // Start FastAPI backend
   await startFastAPI();
   
@@ -202,6 +205,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error processing Instagram webhook:", error);
       res.status(500).json({ message: "Webhook processing failed" });
     }
+  });
+
+  // Catch all route for SPA - serve index.html for unknown routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
   });
 
   const httpServer = createServer(app);
