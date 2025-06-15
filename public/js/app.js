@@ -73,15 +73,16 @@ class App {
 
     // Setup navigation event listeners
     setupNavigation() {
-        // Demo and Contact navigation
-        document.getElementById('demoBtn')?.addEventListener('click', () => {
-            this.showDemo();
+        // Header navigation
+        document.getElementById('loginBtn')?.addEventListener('click', () => {
+            this.showPage('login');
         });
         
-        document.getElementById('contactBtn')?.addEventListener('click', () => {
-            this.showContact();
+        document.getElementById('registerBtn')?.addEventListener('click', () => {
+            this.showPage('register');
         });
         
+        // Landing page action buttons
         document.getElementById('heroContact')?.addEventListener('click', () => {
             this.showContact();
         });
