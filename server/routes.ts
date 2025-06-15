@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -35,155 +36,41 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
+  // Mock user endpoint for development
+  app.get('/api/user', (req, res) => {
+    res.json({
+      id: "test_user_123",
+      email: "test@example.com",
+      first_name: "Test",
+      last_name: "User",
+      profile_image_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
   });
 
-  // Bot management routes
-  app.get('/api/bots', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const bots = await storage.getUserBots(userId);
-      res.json(bots);
-    } catch (error) {
-      console.error("Error fetching bots:", error);
-      res.status(500).json({ message: "Failed to fetch bots" });
-    }
-  });
+  // Proxy specific API routes to FastAPI backend
+  app.use('/api/bots', createProxyMiddleware({
+    target: 'http://localhost:8000',
+    changeOrigin: true
+  }));
 
-  app.post('/api/bots', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const botData = insertBotSchema.parse({ ...req.body, userId });
-      const bot = await storage.createBot(botData);
-      res.status(201).json(bot);
-    } catch (error) {
-      console.error("Error creating bot:", error);
-      res.status(400).json({ message: "Failed to create bot" });
-    }
-  });
+  app.use('/api/stats', createProxyMiddleware({
+    target: 'http://localhost:8000',
+    changeOrigin: true
+  }));
 
-  app.patch('/api/bots/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const botId = parseInt(req.params.id);
-      const updates = req.body;
-      const bot = await storage.updateBot(botId, updates);
-      res.json(bot);
-    } catch (error) {
-      console.error("Error updating bot:", error);
-      res.status(400).json({ message: "Failed to update bot" });
-    }
-  });
+  app.use('/api/knowledge-files', createProxyMiddleware({
+    target: 'http://localhost:8000',
+    changeOrigin: true
+  }));
 
-  app.delete('/api/bots/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const botId = parseInt(req.params.id);
-      await storage.deleteBot(botId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting bot:", error);
-      res.status(400).json({ message: "Failed to delete bot" });
-    }
-  });
+  app.use('/api/recent-activity', createProxyMiddleware({
+    target: 'http://localhost:8000',
+    changeOrigin: true
+  }));
 
-  // Knowledge base routes
-  app.get('/api/knowledge-files', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const files = await storage.getUserKnowledgeFiles(userId);
-      res.json(files);
-    } catch (error) {
-      console.error("Error fetching knowledge files:", error);
-      res.status(500).json({ message: "Failed to fetch knowledge files" });
-    }
-  });
-
-  app.post('/api/knowledge-files', isAuthenticated, upload.single('file'), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const userId = req.user.claims.sub;
-      const fileData = insertKnowledgeFileSchema.parse({
-        userId,
-        fileName: req.file.filename,
-        originalName: req.file.originalname,
-        filePath: req.file.path,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype,
-      });
-
-      const file = await storage.createKnowledgeFile(fileData);
-      res.status(201).json(file);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      res.status(400).json({ message: "Failed to upload file" });
-    }
-  });
-
-  app.delete('/api/knowledge-files/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const fileId = parseInt(req.params.id);
-      await storage.deleteKnowledgeFile(fileId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      res.status(400).json({ message: "Failed to delete file" });
-    }
-  });
-
-  // Analytics routes
-  app.get('/api/stats', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const stats = await storage.getUserMessageStats(userId);
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      res.status(500).json({ message: "Failed to fetch stats" });
-    }
-  });
-
-  app.get('/api/recent-activity', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const bots = await storage.getUserBots(userId);
-      
-      if (bots.length === 0) {
-        return res.json([]);
-      }
-
-      // Get recent messages from all user's bots
-      const recentMessages = await Promise.all(
-        bots.map(bot => storage.getBotMessageLogs(bot.id, 10))
-      );
-      
-      // Flatten and sort by creation time
-      const allMessages = recentMessages
-        .flat()
-        .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
-        .slice(0, 20);
-
-      res.json(allMessages);
-    } catch (error) {
-      console.error("Error fetching recent activity:", error);
-      res.status(500).json({ message: "Failed to fetch recent activity" });
-    }
-  });
-
-  // Webhook handlers for different platforms
+  // Webhook handlers for different platforms (these remain on Express)
   app.post('/api/webhook/telegram/:botId', async (req, res) => {
     try {
       const botId = parseInt(req.params.botId);
@@ -197,13 +84,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           messageId: update.message.message_id.toString(),
           senderId: update.message.from.id.toString(),
           messageText: update.message.text,
-          responseTime: Date.now(), // Will be updated when response is sent
+          responseTime: Date.now(),
         });
         
         await storage.createMessageLog(messageLog);
-        
-        // Here you would integrate with OpenAI and send response
-        // For now, just acknowledge receipt
         res.status(200).json({ ok: true });
       } else {
         res.status(200).json({ ok: true });
