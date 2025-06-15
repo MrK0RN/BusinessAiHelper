@@ -163,6 +163,9 @@ class UserResponse(BaseModel):
     profile_image_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -265,7 +268,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     # Create access token
     access_token = create_access_token(data={"sub": user_id})
     
-    user_response = UserResponse.from_orm(new_user)
+    user_response = UserResponse.model_validate(new_user)
     
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
@@ -279,15 +282,7 @@ async def login(login_data: UserLogin, db: Session = Depends(get_db)):
     # Create access token
     access_token = create_access_token(data={"sub": user.id})
     
-    user_response = UserResponse(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        profile_image_url=user.profile_image_url,
-        created_at=user.created_at,
-        updated_at=user.updated_at
-    )
+    user_response = UserResponse.model_validate(user)
     
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
