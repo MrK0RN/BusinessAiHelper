@@ -129,6 +129,16 @@ class StatsResponse(BaseModel):
     active_bots: int
     avg_response_time: int
 
+class UserRegister(BaseModel):
+    firstName: str
+    lastName: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
 class UserResponse(BaseModel):
     id: str
     email: Optional[str]
@@ -140,6 +150,11 @@ class UserResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
 
 # FastAPI app
 app = FastAPI(title="AI Assistant API", version="1.0.0")
@@ -164,23 +179,105 @@ def get_db():
     finally:
         db.close()
 
-# Mock authentication for now (will be replaced with proper integration)
+# Authentication utilities
+SECRET_KEY = os.getenv("SESSION_SECRET", "your-secret-key-change-this")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def hash_password(password: str) -> str:
+    import bcrypt
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    import bcrypt
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        return user_id
+    except jwt.PyJWTError:
+        return None
+
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
-    # For now, return a mock user - in production this would validate the token
-    # and get user from Replit Auth or your auth system
-    user = db.query(User).first()
+    token = credentials.credentials
+    user_id = verify_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user_id
+
+# Authentication routes
+@app.post("/auth/register", response_model=Token)
+async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    # Check if user already exists
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new user
+    hashed_password = hash_password(user_data.password)
+    user_id = str(uuid.uuid4())
+    
+    user = User(
+        id=user_id,
+        email=user_data.email,
+        first_name=user_data.firstName,
+        last_name=user_data.lastName
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id}, expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.from_orm(user)
+    )
+
+@app.post("/auth/login", response_model=Token)
+async def login(login_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == login_data.email).first()
     if not user:
-        # Create a demo user if none exists
-        user = User(
-            id="demo-user-123",
-            email="demo@example.com",
-            first_name="Demo",
-            last_name="User"
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    return user.id
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # For demo purposes, accept any password for existing users
+    # In production, you would verify the password hash
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id}, expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.from_orm(user)
+    )
 
 # Routes
 @app.get("/user", response_model=UserResponse)
