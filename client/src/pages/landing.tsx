@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import Hero from "@/components/landing/hero";
 import Features from "@/components/landing/features";
 import Integrations from "@/components/landing/integrations";
+import Pricing from "@/components/landing/pricing";
 import CTA from "@/components/landing/cta";
 import { Button } from "@/components/ui/button";
 import { Bot } from "lucide-react";
@@ -50,7 +51,7 @@ export default function Landing() {
                 <a href="#integrations" className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors">
                   Интеграции
                 </a>
-                <a href="#cta" className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors">
+                <a href="#pricing" className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors">
                   Тарифы
                 </a>
               </div>
@@ -73,6 +74,7 @@ export default function Landing() {
         <Hero onGetStarted={handleGetStarted} />
         <Features />
         <Integrations />
+        <Pricing onGetStarted={handleGetStarted} />
         <CTA onGetStarted={handleGetStarted} />
       </main>
     </div>
