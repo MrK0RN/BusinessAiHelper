@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import Sidebar from "@/components/dashboard/sidebar";
 import StatsCards from "@/components/dashboard/stats-cards";
 import BotStatusCard from "@/components/dashboard/bot-status-card";
@@ -13,30 +15,32 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export default function Dashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        title: "Необходима авторизация",
+        description: "Выполняется перенаправление на страницу входа...",
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        setLocation('/login');
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, isLoading, toast, setLocation]);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     toast({
       title: "Выход выполнен",
       description: "До свидания!",
     });
     setTimeout(() => {
-      window.location.reload();
+      setLocation('/');
     }, 1000);
   };
 

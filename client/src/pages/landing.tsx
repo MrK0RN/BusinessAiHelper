@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import Hero from "@/components/landing/hero";
 import Features from "@/components/landing/features";
 import Integrations from "@/components/landing/integrations";
@@ -11,20 +12,21 @@ import { Bot } from "lucide-react";
 export default function Landing() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Redirect to dashboard if authenticated
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      window.location.href = "/dashboard";
+      setLocation("/");
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, setLocation]);
 
   const handleLogin = () => {
-    window.location.href = "/login";
+    setLocation("/login");
   };
 
   const handleGetStarted = () => {
-    window.location.href = "/register";
+    setLocation("/register");
   };
 
   return (
