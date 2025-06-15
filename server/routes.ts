@@ -1,12 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { createProxyMiddleware } from "http-proxy-middleware";
+import { startFastAPI, setupFastAPIProxy } from "./fastapi_proxy";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertBotSchema, insertKnowledgeFileSchema, insertMessageLogSchema } from "@shared/schema";
+import { insertMessageLogSchema } from "@shared/schema";
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -36,39 +35,11 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Mock user endpoint for development
-  app.get('/api/user', (req, res) => {
-    res.json({
-      id: "test_user_123",
-      email: "test@example.com",
-      first_name: "Test",
-      last_name: "User",
-      profile_image_url: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-  });
-
-  // Proxy specific API routes to FastAPI backend
-  app.use('/api/bots', createProxyMiddleware({
-    target: 'http://localhost:8000',
-    changeOrigin: true
-  }));
-
-  app.use('/api/stats', createProxyMiddleware({
-    target: 'http://localhost:8000',
-    changeOrigin: true
-  }));
-
-  app.use('/api/knowledge-files', createProxyMiddleware({
-    target: 'http://localhost:8000',
-    changeOrigin: true
-  }));
-
-  app.use('/api/recent-activity', createProxyMiddleware({
-    target: 'http://localhost:8000',
-    changeOrigin: true
-  }));
+  // Start FastAPI backend
+  await startFastAPI();
+  
+  // Setup FastAPI proxy routes
+  setupFastAPIProxy(app);
 
   // Webhook handlers for different platforms (these remain on Express)
   app.post('/api/webhook/telegram/:botId', async (req, res) => {
