@@ -74,13 +74,26 @@ class App {
     // Setup navigation event listeners
     setupNavigation() {
         // Header navigation
-        document.getElementById('loginBtn')?.addEventListener('click', () => {
-            this.showPage('login');
-        });
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
         
-        document.getElementById('registerBtn')?.addEventListener('click', () => {
-            this.showPage('register');
-        });
+        console.log('Setting up navigation. Login btn:', !!loginBtn, 'Register btn:', !!registerBtn);
+        
+        if (loginBtn) {
+            loginBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Login button clicked');
+                this.showPage('login');
+            });
+        }
+        
+        if (registerBtn) {
+            registerBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Register button clicked');
+                this.showPage('register');
+            });
+        }
         
         // Landing page action buttons
         document.getElementById('heroContact')?.addEventListener('click', () => {
@@ -211,21 +224,31 @@ class App {
 
     // Show specific page
     showPage(pageName) {
+        console.log('Showing page:', pageName);
+        
         // Hide all pages
-        document.querySelectorAll('.page').forEach(page => {
+        const allPages = document.querySelectorAll('.page');
+        console.log('Found pages:', allPages.length);
+        allPages.forEach(page => {
             page.classList.remove('active');
         });
 
         // Show target page
-        const targetPage = document.getElementById(`${pageName}Page`);
+        const targetPageId = `${pageName}Page`;
+        const targetPage = document.getElementById(targetPageId);
+        console.log('Target page ID:', targetPageId, 'Found:', !!targetPage);
+        
         if (targetPage) {
             targetPage.classList.add('active');
             this.currentPage = pageName;
+            console.log('Page activated:', pageName);
 
             // Initialize dashboard if showing dashboard page
             if (pageName === 'dashboard' && auth.isAuthenticated()) {
                 dashboard.init();
             }
+        } else {
+            console.error('Page not found:', targetPageId);
         }
     }
 
