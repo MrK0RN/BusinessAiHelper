@@ -54,7 +54,7 @@ export default function Login() {
         description: "Добро пожаловать в панель управления!",
       });
       setTimeout(() => {
-        window.location.reload();
+        setLocation('/');
       }, 1500);
     },
     onError: (error: any) => {

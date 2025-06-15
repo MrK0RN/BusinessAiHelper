@@ -18,8 +18,11 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
   
-  // Add mock authorization for FastAPI backend
-  headers["Authorization"] = "Bearer demo-token";
+  // Add authorization token from localStorage
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const res = await fetch(url, {
     method,
@@ -38,11 +41,17 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {};
+    
+    // Add authorization token from localStorage
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
-      headers: {
-        "Authorization": "Bearer demo-token"
-      }
+      headers
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

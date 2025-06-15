@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const registerSchema = z.object({
   firstName: z.string().min(2, "Имя должно содержать минимум 2 символа"),
@@ -61,7 +61,7 @@ export default function Register() {
         description: "Добро пожаловать! Переходим в панель управления.",
       });
       setTimeout(() => {
-        window.location.reload();
+        setLocation('/');
       }, 1500);
     },
     onError: (error: any) => {
