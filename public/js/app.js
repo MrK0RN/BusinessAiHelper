@@ -185,7 +185,15 @@ class App {
             confirmPassword: formData.get('confirmPassword')
         };
 
+        console.log('Register attempt:', { 
+            firstName: data.firstName, 
+            lastName: data.lastName, 
+            email: data.email, 
+            hasPassword: !!data.password 
+        });
+
         if (!validateRegisterForm(data)) {
+            console.log('Register form validation failed');
             return;
         }
 
@@ -193,9 +201,11 @@ class App {
         const { confirmPassword, ...registerData } = data;
 
         try {
-            await auth.register(registerData);
+            const result = await auth.register(registerData);
+            console.log('Registration successful:', result);
+            this.route(); // Navigate to appropriate page
         } catch (error) {
-            // Error handling is done in auth.register
+            console.error('Registration failed:', error);
         }
     }
 
