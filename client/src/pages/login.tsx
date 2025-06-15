@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const loginSchema = z.object({
   email: z.string().email("Введите корректный email адрес"),
@@ -49,6 +49,8 @@ export default function Login() {
     },
     onSuccess: (data) => {
       localStorage.setItem('auth_token', data.access_token);
+      // Invalidate queries to trigger re-authentication
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Успешный вход",
         description: "Добро пожаловать в панель управления!",

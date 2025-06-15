@@ -56,6 +56,8 @@ export default function Register() {
     },
     onSuccess: (data) => {
       localStorage.setItem('auth_token', data.access_token);
+      // Invalidate queries to trigger re-authentication
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Регистрация успешна",
         description: "Добро пожаловать! Переходим в панель управления.",
