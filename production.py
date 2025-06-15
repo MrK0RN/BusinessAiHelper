@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-AI Assistant Platform - Production Deployment Script
-Веб-платформа AI-ассистента для бизнеса с интеграцией мессенджеров
+AI Assistant Platform - Simplified Production Server
+Standalone FastAPI application for production deployment
 """
 
 from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
@@ -21,16 +22,16 @@ import os
 import uuid
 from pathlib import Path
 
-# Production Configuration
+# Application Configuration
 app = FastAPI(
     title="AI Assistant Platform",
-    description="Многофункциональная AI-ассистент платформа с интегрированными коммуникационными каналами",
+    description="Production-ready AI Assistant Platform",
     version="1.0.0",
-    docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
+    docs_url=None,  # Disable docs in production
     redoc_url=None
 )
 
-# CORS Configuration
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,25 +40,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database Configuration
+# Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Security Configuration
+# Security
 security = HTTPBearer()
-SECRET_KEY = os.getenv("SESSION_SECRET", "your-secret-key-change-this")
+SECRET_KEY = os.getenv("SESSION_SECRET", "fallback-secret-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Database Models
+# Models
 class User(Base):
     __tablename__ = "users"
-    
     id = Column(String, primary_key=True)
     email = Column(String, unique=True)
     first_name = Column(String)
@@ -65,30 +65,26 @@ class User(Base):
     profile_image_url = Column(String)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
     bots = relationship("Bot", back_populates="user")
     knowledge_files = relationship("KnowledgeFile", back_populates="user")
 
 class Bot(Base):
     __tablename__ = "bots"
-    
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"))
-    platform = Column(String, nullable=False)  # telegram, whatsapp, instagram
+    platform = Column(String, nullable=False)
     name = Column(String, nullable=False)
     token = Column(String)
     webhook_url = Column(String)
     is_active = Column(Boolean, default=False)
-    config = Column(Text)  # JSON config
+    config = Column(Text)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
     user = relationship("User", back_populates="bots")
     message_logs = relationship("MessageLog", back_populates="bot")
 
 class KnowledgeFile(Base):
     __tablename__ = "knowledge_files"
-    
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"))
     file_name = Column(String, nullable=False)
@@ -98,12 +94,10 @@ class KnowledgeFile(Base):
     mime_type = Column(String, nullable=False)
     is_processed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
-    
     user = relationship("User", back_populates="knowledge_files")
 
 class MessageLog(Base):
     __tablename__ = "message_logs"
-    
     id = Column(Integer, primary_key=True, autoincrement=True)
     bot_id = Column(Integer, ForeignKey("bots.id"))
     platform = Column(String, nullable=False)
@@ -111,19 +105,37 @@ class MessageLog(Base):
     sender_id = Column(String)
     message_text = Column(Text)
     response_text = Column(Text)
-    response_time = Column(Integer)  # in milliseconds
+    response_time = Column(Integer)
     is_auto_response = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
-    
     bot = relationship("Bot", back_populates="message_logs")
 
-# Pydantic Models
-class UserCreate(BaseModel):
+# Pydantic models
+class UserRegister(BaseModel):
+    firstName: str
+    lastName: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
     id: str
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    profile_image_url: Optional[str] = None
+    email: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    profile_image_url: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
 
 class BotCreate(BaseModel):
     platform: str
@@ -150,34 +162,7 @@ class StatsResponse(BaseModel):
     active_bots: int
     avg_response_time: int
 
-class UserRegister(BaseModel):
-    firstName: str
-    lastName: str
-    email: str
-    password: str
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    id: str
-    email: Optional[str]
-    first_name: Optional[str]
-    last_name: Optional[str]
-    profile_image_url: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
-# Database Session
+# Dependencies
 def get_db():
     db = SessionLocal()
     try:
@@ -185,13 +170,7 @@ def get_db():
     finally:
         db.close()
 
-# Authentication Functions
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
-
+# Auth functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -199,41 +178,39 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            return None
-        return user_id
+        return payload.get("sub")
     except jwt.PyJWTError:
         return None
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
-    token = credentials.credentials
-    user_id = verify_token(token)
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    user_id = verify_token(credentials.credentials)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
     
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    
     return user_id
 
-# Authentication Routes
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "version": "1.0.0"}
+
+# Auth routes
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
+    existing = db.query(User).filter(User.email == user_data.email).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    user_id = str(uuid.uuid4())
     user = User(
-        id=user_id,
+        id=str(uuid.uuid4()),
         email=user_data.email,
         first_name=user_data.firstName,
         last_name=user_data.lastName
@@ -242,46 +219,27 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.id}, expires_delta=access_token_expires
-    )
-    
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        user=UserResponse.from_orm(user)
-    )
+    token = create_access_token({"sub": user.id}, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    return Token(access_token=token, token_type="bearer", user=UserResponse.from_orm(user))
 
 @app.post("/auth/login", response_model=Token)
 async def login(login_data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login_data.email).first()
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.id}, expires_delta=access_token_expires
-    )
-    
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        user=UserResponse.from_orm(user)
-    )
+    token = create_access_token({"sub": user.id}, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    return Token(access_token=token, token_type="bearer", user=UserResponse.from_orm(user))
 
-# API Routes
+# API routes
 @app.get("/user", response_model=UserResponse)
 async def get_user(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == current_user).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @app.get("/bots", response_model=List[BotResponse])
 async def get_bots(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    bots = db.query(Bot).filter(Bot.user_id == current_user).all()
-    return bots
+    return db.query(Bot).filter(Bot.user_id == current_user).all()
 
 @app.post("/bots", response_model=BotResponse)
 async def create_bot(bot_data: BotCreate, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -291,40 +249,12 @@ async def create_bot(bot_data: BotCreate, current_user: str = Depends(get_curren
     db.refresh(bot)
     return bot
 
-@app.put("/bots/{bot_id}", response_model=BotResponse)
-async def update_bot(bot_id: int, bot_data: dict, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    bot = db.query(Bot).filter(Bot.id == bot_id, Bot.user_id == current_user).first()
-    if not bot:
-        raise HTTPException(status_code=404, detail="Bot not found")
-    
-    for key, value in bot_data.items():
-        setattr(bot, key, value)
-    
-    db.commit()
-    db.refresh(bot)
-    return bot
-
-@app.delete("/bots/{bot_id}")
-async def delete_bot(bot_id: int, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    bot = db.query(Bot).filter(Bot.id == bot_id, Bot.user_id == current_user).first()
-    if not bot:
-        raise HTTPException(status_code=404, detail="Bot not found")
-    
-    db.delete(bot)
-    db.commit()
-    return {"success": True}
-
 @app.get("/knowledge-files")
 async def get_knowledge_files(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    files = db.query(KnowledgeFile).filter(KnowledgeFile.user_id == current_user).all()
-    return files
+    return db.query(KnowledgeFile).filter(KnowledgeFile.user_id == current_user).all()
 
 @app.post("/knowledge-files")
-async def upload_knowledge_file(
-    file: UploadFile = File(...),
-    current_user: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
+async def upload_file(file: UploadFile = File(...), current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     upload_dir = Path("uploads")
     upload_dir.mkdir(exist_ok=True)
     
@@ -347,38 +277,16 @@ async def upload_knowledge_file(
     db.add(knowledge_file)
     db.commit()
     db.refresh(knowledge_file)
-    
     return knowledge_file
-
-@app.delete("/knowledge-files/{file_id}")
-async def delete_knowledge_file(file_id: int, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    file_record = db.query(KnowledgeFile).filter(
-        KnowledgeFile.id == file_id, 
-        KnowledgeFile.user_id == current_user
-    ).first()
-    
-    if not file_record:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    file_path_str = str(file_record.file_path)
-    if os.path.exists(file_path_str):
-        os.remove(file_path_str)
-    
-    db.delete(file_record)
-    db.commit()
-    return {"success": True}
 
 @app.get("/stats", response_model=StatsResponse)
 async def get_stats(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    user_bots = db.query(Bot).filter(Bot.user_id == current_user).all()
-    bot_ids = [bot.id for bot in user_bots]
+    bots = db.query(Bot).filter(Bot.user_id == current_user).all()
+    bot_ids = [bot.id for bot in bots]
     
     total_messages = db.query(MessageLog).filter(MessageLog.bot_id.in_(bot_ids)).count() if bot_ids else 0
     active_bots = db.query(Bot).filter(Bot.user_id == current_user, Bot.is_active == True).count()
-    
-    avg_response_time = db.query(func.avg(MessageLog.response_time)).filter(
-        MessageLog.bot_id.in_(bot_ids)
-    ).scalar() or 0
+    avg_response_time = db.query(func.avg(MessageLog.response_time)).filter(MessageLog.bot_id.in_(bot_ids)).scalar() or 0
     
     return StatsResponse(
         total_messages=total_messages,
@@ -388,63 +296,47 @@ async def get_stats(current_user: str = Depends(get_current_user), db: Session =
 
 @app.get("/recent-activity")
 async def get_recent_activity(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    user_bots = db.query(Bot).filter(Bot.user_id == current_user).all()
-    bot_ids = [bot.id for bot in user_bots]
+    bots = db.query(Bot).filter(Bot.user_id == current_user).all()
+    bot_ids = [bot.id for bot in bots]
     
-    recent_messages = db.query(MessageLog).filter(
+    return db.query(MessageLog).filter(
         MessageLog.bot_id.in_(bot_ids)
     ).order_by(MessageLog.created_at.desc()).limit(10).all() if bot_ids else []
-    
-    return recent_messages
 
 # Webhook endpoints
 @app.post("/webhooks/telegram/{bot_id}")
-async def telegram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
+async def telegram_webhook(bot_id: int, update: dict):
     return {"status": "success"}
 
 @app.post("/webhooks/whatsapp/{bot_id}")
-async def whatsapp_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
+async def whatsapp_webhook(bot_id: int, update: dict):
     return {"status": "success"}
 
 @app.post("/webhooks/instagram/{bot_id}")
-async def instagram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
+async def instagram_webhook(bot_id: int, update: dict):
     return {"status": "success"}
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "version": "1.0.0"}
-
-# Serve static files in production
-if os.getenv("NODE_ENV") == "production":
-    # Serve static files with proper fallback to index.html for SPA
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import FileResponse
-    import os.path
-    
-    # Mount static files for assets
+# Static file serving
+if Path("dist").exists():
     app.mount("/assets", StaticFiles(directory="dist/assets"), name="assets")
     
-    # Catch-all handler for SPA routing
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        file_path = f"dist/{full_path}"
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        else:
-            return FileResponse("dist/index.html")
+        file_path = Path(f"dist/{full_path}")
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse("dist/index.html")
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-# Production server runner
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        "deploy:app",
+        "production:app",
         host="0.0.0.0",
         port=port,
-        workers=4 if os.getenv("NODE_ENV") == "production" else 1,
-        reload=os.getenv("NODE_ENV") != "production"
+        workers=1,
+        access_log=False
     )

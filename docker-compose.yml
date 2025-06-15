@@ -13,6 +13,11 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # AI Assistant Application
   app:
@@ -21,13 +26,21 @@ services:
       DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:-your_secure_password}@postgres:5432/ai_assistant
       SESSION_SECRET: ${SESSION_SECRET:-your_session_secret_key_change_this}
       NODE_ENV: production
+      PORT: 8000
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
-      - ./uploads:/app/uploads
+      - app_uploads:/app/uploads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
+  app_uploads:

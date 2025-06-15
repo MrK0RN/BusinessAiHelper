@@ -18,6 +18,7 @@ FROM python:3.11-slim AS backend
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,8 +28,7 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 # Копирование файлов приложения
-COPY deploy.py ./
-COPY uploads/ ./uploads/
+COPY production.py ./
 
 # Копирование собранного frontend
 COPY --from=frontend-builder /app/dist ./dist
@@ -44,4 +44,4 @@ ENV NODE_ENV=production
 ENV PYTHONUNBUFFERED=1
 
 # Запуск приложения
-CMD ["python", "deploy.py"]
+CMD ["python", "production.py"]
