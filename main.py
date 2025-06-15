@@ -9,8 +9,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import uvicorn
+import hashlib
+import secrets
+import jwt
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -29,6 +32,7 @@ class User(Base):
     email = Column(String, unique=True)
     first_name = Column(String)
     last_name = Column(String)
+    password_hash = Column(String)
     profile_image_url = Column(String)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -95,14 +99,7 @@ class UserCreate(BaseModel):
     last_name: Optional[str] = None
     profile_image_url: Optional[str] = None
 
-class UserResponse(BaseModel):
-    id: str
-    email: Optional[str]
-    first_name: Optional[str]
-    last_name: Optional[str]
-    profile_image_url: Optional[str]
-    created_at: datetime
-    updated_at: datetime
+
 
 class BotCreate(BaseModel):
     platform: str
@@ -139,6 +136,31 @@ class StatsResponse(BaseModel):
     active_bots: int
     avg_response_time: int
 
+# Auth models
+class UserRegister(BaseModel):
+    firstName: str
+    lastName: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    first_name: str
+    last_name: str
+    profile_image_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -165,10 +187,109 @@ def get_db():
     finally:
         db.close()
 
-# Simple auth for development
-def get_current_user():
-    # For development, return a mock user
-    return "test_user_123"
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Password hashing functions
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    return hash_password(password) == hashed_password
+
+# JWT functions
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        return user_id
+    except jwt.PyJWTError:
+        return None
+
+# Auth dependency
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    user_id = verify_token(credentials.credentials)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user_id
+
+# Auth routes
+@app.post("/auth/register", response_model=Token)
+async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    # Check if user already exists
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+    
+    # Create new user with hashed password
+    user_id = secrets.token_urlsafe(32)
+    new_user = User(
+        id=user_id,
+        email=user_data.email,
+        first_name=user_data.firstName,
+        last_name=user_data.lastName,
+        password_hash=hash_password(user_data.password)
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user_id})
+    
+    user_response = UserResponse(
+        id=new_user.id,
+        email=new_user.email,
+        first_name=new_user.first_name,
+        last_name=new_user.last_name,
+        profile_image_url=new_user.profile_image_url,
+        created_at=new_user.created_at,
+        updated_at=new_user.updated_at
+    )
+    
+    return Token(access_token=access_token, token_type="bearer", user=user_response)
+
+@app.post("/auth/login", response_model=Token)
+async def login(login_data: UserLogin, db: Session = Depends(get_db)):
+    # Find user by email
+    user = db.query(User).filter(User.email == login_data.email).first()
+    if not user or not verify_password(login_data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Неверный email или пароль")
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.id})
+    
+    user_response = UserResponse(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        profile_image_url=user.profile_image_url,
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
+    
+    return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 # Routes
 @app.get("/api/auth/user", response_model=UserResponse)

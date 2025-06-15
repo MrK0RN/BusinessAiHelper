@@ -32,13 +32,20 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
-      return await apiRequest("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         body: JSON.stringify(data),
         headers: {
           "Content-Type": "application/json",
         },
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Неверный email или пароль");
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       toast({
