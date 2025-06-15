@@ -20,15 +20,12 @@ export default function Landing() {
   }, [isAuthenticated, isLoading]);
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    // For demo purposes, directly redirect to dashboard
+    window.location.href = "/dashboard";
   };
 
   const handleGetStarted = () => {
-    if (isAuthenticated) {
-      window.location.href = "/dashboard";
-    } else {
-      window.location.href = "/api/login";
-    }
+    window.location.href = "/dashboard";
   };
 
   return (
