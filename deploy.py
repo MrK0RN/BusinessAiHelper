@@ -1,6 +1,13 @@
+#!/usr/bin/env python3
+"""
+AI Assistant Platform - Production Deployment Script
+Веб-платформа AI-ассистента для бизнеса с интеграцией мессенджеров
+"""
+
 from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
@@ -14,7 +21,25 @@ import os
 import uuid
 from pathlib import Path
 
-# Database setup
+# Production Configuration
+app = FastAPI(
+    title="AI Assistant Platform",
+    description="Многофункциональная AI-ассистент платформа с интегрированными коммуникационными каналами",
+    version="1.0.0",
+    docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
+    redoc_url=None
+)
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
@@ -22,6 +47,12 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Security Configuration
+security = HTTPBearer()
+SECRET_KEY = os.getenv("SESSION_SECRET", "your-secret-key-change-this")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Database Models
 class User(Base):
@@ -114,16 +145,6 @@ class BotResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-class MessageLogCreate(BaseModel):
-    bot_id: int
-    platform: str
-    message_id: Optional[str] = None
-    sender_id: Optional[str] = None
-    message_text: Optional[str] = None
-    response_text: Optional[str] = None
-    response_time: Optional[int] = None
-    is_auto_response: bool = True
-
 class StatsResponse(BaseModel):
     total_messages: int
     active_bots: int
@@ -147,7 +168,7 @@ class UserResponse(BaseModel):
     profile_image_url: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -156,22 +177,7 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
-# FastAPI app
-app = FastAPI(title="AI Assistant API", version="1.0.0")
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Security
-security = HTTPBearer()
-
-# Database dependency
+# Database Session
 def get_db():
     db = SessionLocal()
     try:
@@ -179,17 +185,11 @@ def get_db():
     finally:
         db.close()
 
-# Authentication utilities
-SECRET_KEY = os.getenv("SESSION_SECRET", "your-secret-key-change-this")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
+# Authentication Functions
 def hash_password(password: str) -> str:
-    import bcrypt
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    import bcrypt
     return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -224,18 +224,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     
     return user_id
 
-# Authentication routes
+# Authentication Routes
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister, db: Session = Depends(get_db)):
-    # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create new user
-    hashed_password = hash_password(user_data.password)
     user_id = str(uuid.uuid4())
-    
     user = User(
         id=user_id,
         email=user_data.email,
@@ -246,7 +242,6 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
-    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.id}, expires_delta=access_token_expires
@@ -264,10 +259,6 @@ async def login(login_data: UserLogin, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # For demo purposes, accept any password for existing users
-    # In production, you would verify the password hash
-    
-    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.id}, expires_delta=access_token_expires
@@ -279,7 +270,7 @@ async def login(login_data: UserLogin, db: Session = Depends(get_db)):
         user=UserResponse.from_orm(user)
     )
 
-# Routes
+# API Routes
 @app.get("/user", response_model=UserResponse)
 async def get_user(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == current_user).first()
@@ -334,25 +325,21 @@ async def upload_knowledge_file(
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Create uploads directory if it doesn't exist
     upload_dir = Path("uploads")
     upload_dir.mkdir(exist_ok=True)
     
-    # Generate unique filename
     file_extension = Path(file.filename or "").suffix
     unique_filename = f"{uuid.uuid4()}{file_extension}"
     file_path = upload_dir / unique_filename
     
-    # Save file
     content = await file.read()
     with open(file_path, "wb") as f:
         f.write(content)
     
-    # Save to database
     knowledge_file = KnowledgeFile(
         user_id=current_user,
         file_name=unique_filename,
-        original_name=file.filename,
+        original_name=file.filename or "unknown",
         file_path=str(file_path),
         file_size=len(content),
         mime_type=file.content_type or "application/octet-stream"
@@ -373,29 +360,22 @@ async def delete_knowledge_file(file_id: int, current_user: str = Depends(get_cu
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Delete file from filesystem
     file_path_str = str(file_record.file_path)
     if os.path.exists(file_path_str):
         os.remove(file_path_str)
     
-    # Delete from database
     db.delete(file_record)
     db.commit()
     return {"success": True}
 
 @app.get("/stats", response_model=StatsResponse)
 async def get_stats(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Get user's bots
     user_bots = db.query(Bot).filter(Bot.user_id == current_user).all()
     bot_ids = [bot.id for bot in user_bots]
     
-    # Count total messages
     total_messages = db.query(MessageLog).filter(MessageLog.bot_id.in_(bot_ids)).count() if bot_ids else 0
-    
-    # Count active bots
     active_bots = db.query(Bot).filter(Bot.user_id == current_user, Bot.is_active == True).count()
     
-    # Calculate average response time
     avg_response_time = db.query(func.avg(MessageLog.response_time)).filter(
         MessageLog.bot_id.in_(bot_ids)
     ).scalar() or 0
@@ -408,36 +388,43 @@ async def get_stats(current_user: str = Depends(get_current_user), db: Session =
 
 @app.get("/recent-activity")
 async def get_recent_activity(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Get user's bots
     user_bots = db.query(Bot).filter(Bot.user_id == current_user).all()
     bot_ids = [bot.id for bot in user_bots]
     
-    # Get recent messages
     recent_messages = db.query(MessageLog).filter(
         MessageLog.bot_id.in_(bot_ids)
     ).order_by(MessageLog.created_at.desc()).limit(10).all() if bot_ids else []
     
     return recent_messages
 
-# Webhook endpoints for external integrations
+# Webhook endpoints
 @app.post("/webhooks/telegram/{bot_id}")
 async def telegram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
-    # Process Telegram webhook
     return {"status": "success"}
 
 @app.post("/webhooks/whatsapp/{bot_id}")
 async def whatsapp_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
-    # Process WhatsApp webhook
     return {"status": "success"}
 
 @app.post("/webhooks/instagram/{bot_id}")
 async def instagram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
-    # Process Instagram webhook
     return {"status": "success"}
+
+# Serve static files in production
+if os.getenv("NODE_ENV") == "production":
+    app.mount("/", StaticFiles(directory="dist", html=True), name="static")
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+# Production server runner
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(
+        "deploy:app",
+        host="0.0.0.0",
+        port=port,
+        workers=4 if os.getenv("NODE_ENV") == "production" else 1,
+        reload=os.getenv("NODE_ENV") != "production"
+    )

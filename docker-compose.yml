@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ai_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-your_secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # AI Assistant Application
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:-your_secure_password}@postgres:5432/ai_assistant
+      SESSION_SECRET: ${SESSION_SECRET:-your_session_secret_key_change_this}
+      NODE_ENV: production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
