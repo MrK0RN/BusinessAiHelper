@@ -20,12 +20,11 @@ export default function Landing() {
   }, [isAuthenticated, isLoading]);
 
   const handleLogin = () => {
-    // For demo purposes, directly redirect to dashboard
-    window.location.href = "/dashboard";
+    window.location.href = "/login";
   };
 
   const handleGetStarted = () => {
-    window.location.href = "/dashboard";
+    window.location.href = "/register";
   };
 
   return (
