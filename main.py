@@ -162,8 +162,8 @@ def get_db():
     finally:
         db.close()
 
-# Mock auth for development (replace with real auth)
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+# Simple auth for development
+def get_current_user():
     # For development, return a mock user
     return "test_user_123"
 

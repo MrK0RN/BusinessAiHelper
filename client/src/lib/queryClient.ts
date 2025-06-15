@@ -10,12 +10,21 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown | FormData,
 ): Promise<Response> {
+  const headers: Record<string, string> = {};
+  
+  if (data && !(data instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Add mock authorization for FastAPI backend
+  headers["Authorization"] = "Bearer demo-token";
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers,
+    body: data instanceof FormData ? data : (data ? JSON.stringify(data) : undefined),
     credentials: "include",
   });
 
@@ -31,6 +40,9 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
+      headers: {
+        "Authorization": "Bearer demo-token"
+      }
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
