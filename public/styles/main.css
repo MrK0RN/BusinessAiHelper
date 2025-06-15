@@ -1058,6 +1058,18 @@ body {
     justify-content: center;
     min-height: 100vh;
     padding: var(--space-4);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+}
+
+/* Hide navbar on auth pages */
+.page.active ~ * .navbar,
+.auth-page.active ~ .navbar {
+    display: none;
 }
 
 .auth-container {

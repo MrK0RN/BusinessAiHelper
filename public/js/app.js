@@ -243,6 +243,16 @@ class App {
             this.currentPage = pageName;
             console.log('Page activated:', pageName);
 
+            // Hide/show navbar based on page type
+            const navbar = document.querySelector('.navbar');
+            if (navbar) {
+                if (pageName === 'login' || pageName === 'register') {
+                    navbar.style.display = 'none';
+                } else {
+                    navbar.style.display = 'block';
+                }
+            }
+
             // Initialize dashboard if showing dashboard page
             if (pageName === 'dashboard' && auth.isAuthenticated()) {
                 dashboard.init();
