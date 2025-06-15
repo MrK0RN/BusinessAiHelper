@@ -20,7 +20,15 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args={
+        "sslmode": "require",
+        "connect_timeout": 10
+    }
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -257,15 +265,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     # Create access token
     access_token = create_access_token(data={"sub": user_id})
     
-    user_response = UserResponse(
-        id=new_user.id,
-        email=new_user.email,
-        first_name=new_user.first_name,
-        last_name=new_user.last_name,
-        profile_image_url=new_user.profile_image_url,
-        created_at=new_user.created_at,
-        updated_at=new_user.updated_at
-    )
+    user_response = UserResponse.from_orm(new_user)
     
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
@@ -273,7 +273,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
 async def login(login_data: UserLogin, db: Session = Depends(get_db)):
     # Find user by email
     user = db.query(User).filter(User.email == login_data.email).first()
-    if not user or not verify_password(login_data.password, user.password_hash):
+    if not user or not verify_password(login_data.password, str(user.password_hash)):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     
     # Create access token
