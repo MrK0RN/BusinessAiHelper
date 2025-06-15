@@ -12,6 +12,10 @@ if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
 }
 
+if (!process.env.REPL_ID) {
+  throw new Error("Environment variable REPL_ID not provided");
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -38,8 +42,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   });
 }
@@ -102,6 +107,10 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    console.log(`[AUTH] Login attempt for hostname: ${req.hostname}`);
+    console.log(`[AUTH] Available domains: ${process.env.REPLIT_DOMAINS}`);
+    console.log(`[AUTH] REPL_ID: ${process.env.REPL_ID}`);
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
