@@ -73,25 +73,25 @@ class App {
 
     // Setup navigation event listeners
     setupNavigation() {
-        // Login/Register navigation
-        document.getElementById('loginBtn')?.addEventListener('click', () => {
-            this.showPage('login');
+        // Demo and Contact navigation
+        document.getElementById('demoBtn')?.addEventListener('click', () => {
+            this.showDemo();
         });
         
-        document.getElementById('registerBtn')?.addEventListener('click', () => {
-            this.showPage('register');
+        document.getElementById('contactBtn')?.addEventListener('click', () => {
+            this.showContact();
         });
         
-        document.getElementById('heroGetStarted')?.addEventListener('click', () => {
-            this.showPage('register');
+        document.getElementById('heroContact')?.addEventListener('click', () => {
+            this.showContact();
         });
         
         document.getElementById('heroDemo')?.addEventListener('click', () => {
-            this.showPage('register');
+            this.showDemo();
         });
         
-        document.getElementById('ctaGetStarted')?.addEventListener('click', () => {
-            this.showPage('register');
+        document.getElementById('ctaContact')?.addEventListener('click', () => {
+            this.showContact();
         });
 
         // Auth page navigation
@@ -211,6 +211,20 @@ class App {
                 dashboard.init();
             }
         }
+    }
+
+    // Show demo section
+    showDemo() {
+        const featuresSection = document.querySelector('.features');
+        if (featuresSection) {
+            featuresSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        showToast('Демо', 'Просмотрите возможности платформы в секции ниже', 'info');
+    }
+
+    // Show contact information
+    showContact() {
+        showToast('Связаться с нами', 'Email: support@aiassistant.ru | Телефон: +7 (495) 123-45-67', 'info');
     }
 
     // Route based on auth state
