@@ -1050,6 +1050,53 @@ body {
     width: 100%;
 }
 
+/* Auth Pages */
+.auth-page {
+    background: var(--gray-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: var(--space-4);
+}
+
+.auth-container {
+    max-width: 400px;
+    width: 100%;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: var(--space-8);
+}
+
+.auth-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+    color: var(--gray-900);
+}
+
+.auth-subtitle {
+    color: var(--gray-600);
+    font-size: var(--font-size-base);
+}
+
+.auth-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-8);
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.section-subtitle {
+    text-align: center;
+    color: var(--gray-600);
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-2);
+}
+
 @media (max-width: 768px) {
     .integrations-grid,
     .pricing-grid {
@@ -1058,5 +1105,14 @@ body {
     
     .pricing-card.featured {
         transform: none;
+    }
+    
+    .auth-container {
+        max-width: 100%;
+        margin: 0 var(--space-4);
+    }
+    
+    .auth-card {
+        padding: var(--space-6);
     }
 }
