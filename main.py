@@ -339,7 +339,7 @@ async def upload_knowledge_file(
     upload_dir.mkdir(exist_ok=True)
     
     # Generate unique filename
-    file_extension = Path(file.filename).suffix
+    file_extension = Path(file.filename or "").suffix
     unique_filename = f"{uuid.uuid4()}{file_extension}"
     file_path = upload_dir / unique_filename
     
@@ -389,7 +389,7 @@ async def get_stats(current_user: str = Depends(get_current_user), db: Session =
     bot_ids = [bot.id for bot in user_bots]
     
     # Count total messages
-    total_messages = db.query(MessageLog).filter(MessageLog.bot_id.in_(bot_ids)).count()
+    total_messages = db.query(MessageLog).filter(MessageLog.bot_id.in_(bot_ids)).count() if bot_ids else 0
     
     # Count active bots
     active_bots = db.query(Bot).filter(Bot.user_id == current_user, Bot.is_active == True).count()
@@ -411,61 +411,31 @@ async def get_recent_activity(current_user: str = Depends(get_current_user), db:
     user_bots = db.query(Bot).filter(Bot.user_id == current_user).all()
     bot_ids = [bot.id for bot in user_bots]
     
-    # Get recent message logs
-    recent_logs = db.query(MessageLog).filter(
+    # Get recent messages
+    recent_messages = db.query(MessageLog).filter(
         MessageLog.bot_id.in_(bot_ids)
-    ).order_by(MessageLog.created_at.desc()).limit(20).all()
+    ).order_by(MessageLog.created_at.desc()).limit(10).all() if bot_ids else []
     
-    return recent_logs
+    return recent_messages
 
-# Webhook endpoints
+# Webhook endpoints for external integrations
 @app.post("/webhooks/telegram/{bot_id}")
 async def telegram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
     # Process Telegram webhook
-    message_log = MessageLog(
-        bot_id=bot_id,
-        platform="telegram",
-        message_id=str(update.get("message", {}).get("message_id")),
-        sender_id=str(update.get("message", {}).get("from", {}).get("id")),
-        message_text=update.get("message", {}).get("text"),
-        response_text="Auto-response placeholder",
-        response_time=100
-    )
-    db.add(message_log)
-    db.commit()
-    return {"success": True}
+    return {"status": "success"}
 
 @app.post("/webhooks/whatsapp/{bot_id}")
 async def whatsapp_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
     # Process WhatsApp webhook
-    message_log = MessageLog(
-        bot_id=bot_id,
-        platform="whatsapp",
-        message_id=update.get("id"),
-        sender_id=update.get("from"),
-        message_text=update.get("text", {}).get("body"),
-        response_text="Auto-response placeholder",
-        response_time=150
-    )
-    db.add(message_log)
-    db.commit()
-    return {"success": True}
+    return {"status": "success"}
 
 @app.post("/webhooks/instagram/{bot_id}")
 async def instagram_webhook(bot_id: int, update: dict, db: Session = Depends(get_db)):
     # Process Instagram webhook
-    message_log = MessageLog(
-        bot_id=bot_id,
-        platform="instagram",
-        message_id=update.get("id"),
-        sender_id=update.get("sender", {}).get("id"),
-        message_text=update.get("message", {}).get("text"),
-        response_text="Auto-response placeholder",
-        response_time=200
-    )
-    db.add(message_log)
-    db.commit()
-    return {"success": True}
+    return {"status": "success"}
+
+# Create tables
+Base.metadata.create_all(bind=engine)
 
 if __name__ == "__main__":
     import uvicorn
