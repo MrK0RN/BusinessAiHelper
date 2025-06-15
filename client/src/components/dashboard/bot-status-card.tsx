@@ -33,31 +33,9 @@ export default function BotStatusCard() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Mock data for demonstration
-  const bots = [
-    {
-      id: 1,
-      name: "Telegram Assistant",
-      platform: "telegram",
-      isActive: true,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: 2,
-      name: "WhatsApp Bot",
-      platform: "whatsapp",
-      isActive: true,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: 3,
-      name: "Instagram Helper",
-      platform: "instagram",
-      isActive: false,
-      updatedAt: new Date().toISOString()
-    }
-  ];
-  const isLoading = false;
+  const { data: bots, isLoading } = useQuery({
+    queryKey: ["/api/bots"],
+  });
 
   const refreshMutation = useMutation({
     mutationFn: async () => {

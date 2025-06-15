@@ -20,24 +20,9 @@ export default function KnowledgeBaseCard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Mock data for demonstration
-  const files = [
-    {
-      id: 1,
-      originalName: "company-handbook.pdf",
-      mimeType: "application/pdf",
-      fileSize: 2547892,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 2,
-      originalName: "product-guide.docx", 
-      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileSize: 1234567,
-      createdAt: new Date().toISOString()
-    }
-  ];
-  const isLoading = false;
+  const { data: files, isLoading } = useQuery({
+    queryKey: ["/api/knowledge-files"],
+  });
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {

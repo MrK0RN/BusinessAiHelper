@@ -9,13 +9,9 @@ import {
 } from "lucide-react";
 
 export default function StatsCards() {
-  // Using mock data for demo
-  const stats = {
-    totalMessages: 247,
-    activeBots: 3,
-    avgResponseTime: 850
-  };
-  const isLoading = false;
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["/api/stats"],
+  });
 
   if (isLoading) {
     return (
