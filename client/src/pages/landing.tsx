@@ -22,11 +22,11 @@ export default function Landing() {
   }, [isAuthenticated, isLoading, setLocation]);
 
   const handleLogin = () => {
-    setLocation("/login");
+    window.location.href = "/api/login";
   };
 
   const handleGetStarted = () => {
-    setLocation("/register");
+    window.location.href = "/api/login";
   };
 
   return (
