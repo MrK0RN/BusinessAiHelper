@@ -100,13 +100,6 @@ export DATABASE_URL="postgresql://user:password@host:port/database"
 python deploy.py
 ```
 
-### Replit Deployment
-Приложение готово для развёртывания на Replit:
-1. Переменные окружения настроены автоматически
-2. База данных PostgreSQL подключается через DATABASE_URL
-3. Используйте команду `npm run dev` для разработки
-4. Для продакшена используйте `python deploy.py`
-
 ## API Документация
 
 ### Аутентификация
